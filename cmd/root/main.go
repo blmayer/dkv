@@ -4,6 +4,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
+	"math/rand"
 )
 
 var (
@@ -18,6 +20,8 @@ func main() {
 	if p := os.Getenv("PORT"); p != "" {
 		port = p
 	}
+
+	rand.Seed(time.Now().UnixNano())
 
 	// three handlers: one for clients and two for other instances
 	http.HandleFunc("/", keyHandler)

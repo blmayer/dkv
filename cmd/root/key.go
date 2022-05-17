@@ -17,6 +17,8 @@ func keyHandler(w http.ResponseWriter, r *http.Request) {
 		handleGet(w, r)
 	case http.MethodPost:
 		handlePost(w, r)
+	case http.MethodDelete:
+		handleDelete(w, r)
 	}
 	r.Body.Close()
 }
@@ -60,6 +62,39 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 	postToInstances(rep, k, data[:n])
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func handleDelete(w http.ResponseWriter, r *http.Request) {
+	k := r.URL.Path
+	println("handleDelete: key:", k)
+
+	is := keys[k]
+	for _, i := range is {
+		resp, err := writeToInstance(i, op.Delete, []byte(k))
+		if err != nil {
+			println("handleDelete: writeToInstance:", err.Error())
+		}
+		if resp[0] != status.Ok {
+			println("handleDelete: status not ok")
+		}
+
+		// remove from inverted keys index
+		go func(ins int) {
+			ks := ikeys[ins]
+			for u, key := range ks {
+				if key == k {
+					ks[u] = ks[len(ks)-1]
+					ks = ks[:len(ks)-1]
+					ikeys[ins] = ks
+					break
+				}
+			}
+		}(i)
+	}
+
+	delete(keys, k)
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func moveInstanceKeys(i int) {

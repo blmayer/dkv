@@ -3,9 +3,10 @@ package main
 import (
 	"strings"
 
-	"dkv/internal/status"
 	"dkv/internal/op"
+	"dkv/internal/status"
 )
+
 func handleRequest(data []byte) []byte {
 	println("received", string(data))
 	if len(data) == 0 {
@@ -29,4 +30,3 @@ func handleRequest(data []byte) []byte {
 	}
 	return []byte{status.ErrUnknownOp}
 }
-

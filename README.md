@@ -7,7 +7,7 @@
 
 - [x] get
 - [x] post
-- [ ] delete
+- [x] delete
 - [x] check on post [commit](https://github.com/blmayer/dkv/blob/d160e34976d570c9373090b23ef3901b8e04bcc7/cmd/root/instances.go#L60)
 - [ ] tests
 - [ ] make replication better

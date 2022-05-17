@@ -95,7 +95,7 @@ func moveInstanceKeys(i int) {
 				continue
 			}
 			if len(resp) == 0 || resp[0] != status.Ok {
-				println("moveInstanceKeys: no t ok for old key", k)
+				println("moveInstanceKeys: not ok for old key", k)
 				continue
 			}
 			keys[k] = append(keys[k], n)

@@ -57,6 +57,7 @@ func writeToInstance(i int, o byte, data []byte) ([]byte, error) {
 }
 
 func postToInstances(rep int, k string, data []byte) {
+	// TODO: watch for key already used
 	is := chooseInstances(rep)
 	for _, i := range is {
 		println("postToInstances: posting", i, "data:", string(data))
@@ -74,7 +75,6 @@ func postToInstances(rep int, k string, data []byte) {
 			continue
 		}
 
-		// TODO: watch for key already used
 		keys[k] = append(keys[k], i)
 		ikeys[i] = append(ikeys[i], k)
 		println("postToInstances: done", i)

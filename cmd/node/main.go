@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	values    = map[string]string{}
+	values = map[string]string{}
 )
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 	for {
 		data := make([]byte, 1024)
 		n, err := conn.Read(data)
-		println("got request")
+
 		if err == net.ErrClosed || err == io.EOF {
 			println("connection closed from root")
 			return

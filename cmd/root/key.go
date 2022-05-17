@@ -32,37 +32,15 @@ func handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, i := range is {
-		println("requesting", i)
-
-		c := *instances[i]
-		_, err := c.Write(append([]byte{op.Get}, []byte(k)...))
+		println("handleGet: get for", i, k)
+		resp, err := writeToInstance(i, op.Get, []byte(k))
 		if err != nil {
 			println(err.Error())
-			moveInstanceKeys(i, k)
+			go moveInstanceKeys(i)
 			continue
 		}
 
-		// read response
-		println("reading response")
-		data := make([]byte, 1024)
-		n, err := c.Read(data)
-		if err != nil {
-			println(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			continue
-		}
-
-		if n == 0 {
-			http.Error(w, "no data from node", http.StatusInternalServerError)
-			continue
-		}
-		println(i, "sent", string(data))
-		if data[0] != status.Ok {
-			http.Error(w, "node returned not ok", http.StatusInternalServerError)
-			continue
-		}
-
-		w.Write(data[1:n])
+		w.Write(resp[1:])
 		break
 	}
 }
@@ -70,37 +48,61 @@ func handleGet(w http.ResponseWriter, r *http.Request) {
 func handlePost(w http.ResponseWriter, r *http.Request) {
 	k := r.URL.Path
 
-	is := chooseInstances(rep)
 	data := make([]byte, 1024)
 	n, err := r.Body.Read(data)
 	if err != nil && err != io.EOF {
-		println(err.Error())
+		println("handlePost read:", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	println("data:", string(data))
+	r.Body.Close()
+	println("handlePost: data:", string(data[:n]))
+	postToInstances(rep, k, data[:n])
 
-	for _, i := range is {
-		println("requesting", i)
-		c := *instances[i]
-		resp, err := writeToInstance(c, op.Post, []byte(k+"\n"+string(data[:n])))
-		if err != nil {
-			println(err.Error(), "removing")
-			moveInstanceKeys(i, k)
-			handlePost(w, r)
-			return
-		}
-
-		println("write returned", string(resp))
-		if len(resp) == 0 || resp[0] != status.Ok {
-			http.Error(w, "write error", http.StatusInternalServerError)
-			return
-		}
-
-		// TODO: watch for key already used
-		keys[k] = append(keys[k], i)
-		ikeys[i] = append(ikeys[i], k)
-		println("done", i)
-	}
 	w.WriteHeader(http.StatusCreated)
+}
+
+func moveInstanceKeys(i int) {
+	instances[i] = nil
+	println("moveInstanceKeys: moving keys from", i)
+
+	newIs := chooseInstances(rep - 1)
+	for _, k := range ikeys[i] {
+		comps := getCompanionInstances(i, k)
+		if len(comps) == 0 {
+			println("moveInstanceKeys: lost key", k)
+			return
+		}
+		println("moveInstanceKeys: moving keys from", comps[0])
+		println("moveInstanceKeys: requesting", comps[0])
+		resp, err := writeToInstance(comps[0], op.Get, []byte(k))
+		if err != nil {
+			println("moveInstanceKeys: failed to get old key", k)
+			continue
+		}
+		if len(resp) < 2 {
+			println("moveInstanceKeys: no data for old key", k)
+			continue
+		}
+
+		keys[k] = []int{}
+		for _, n := range newIs {
+			println("moving", k, "to", n)
+			data := []byte(k + "\n" + string(resp[1:]))
+			resp, err := writeToInstance(n, op.Post, data)
+			if err != nil {
+				println("moveInstanceKeys: failed to post old key", k)
+				continue
+			}
+			if len(resp) == 0 || resp[0] != status.Ok {
+				println("moveInstanceKeys: no t ok for old key", k)
+				continue
+			}
+			keys[k] = append(keys[k], n)
+			ikeys[n] = append(ikeys[n], k)
+		}
+
+		ikeys[i] = []string{}
+		println("moveInstanceKeys: moved key", k)
+	}
 }

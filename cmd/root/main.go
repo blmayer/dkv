@@ -1,18 +1,18 @@
 package main
 
 import (
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"time"
-	"math/rand"
 )
 
 var (
 	instances []*net.Conn
-	keys    = map[string][]int{}
-	ikeys   = map[int][]string{}
-	rep     = 2
+	keys      = map[string][]int{}
+	ikeys     = map[int][]string{}
+	rep       = 2
 )
 
 func main() {
@@ -23,7 +23,6 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	// three handlers: one for clients and two for other instances
 	http.HandleFunc("/", keyHandler)
 	go func() {
 		err := http.ListenAndServe(":"+port, nil)
@@ -36,13 +35,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	println("server ready on port 1234")
+	println("main: server ready on port 1234")
 	for {
 		conn, err := server.Accept()
 		if err != nil {
 			println(err.Error())
 		}
-		println(conn.RemoteAddr().String(), "connected")
+		println("main:", conn.RemoteAddr().String(), "connected")
 		instances = append(instances, &conn)
 	}
 }

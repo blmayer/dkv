@@ -10,9 +10,11 @@ import (
 
 var (
 	instances []*net.Conn
-	keys      = map[string][]int{}
-	ikeys     = map[int][]string{}
-	rep       = 2
+
+	// TODO: get rid of theses maps
+	keys  = map[string][]int{}
+	ikeys = map[int][]string{}
+	rep   = 2
 )
 
 func main() {

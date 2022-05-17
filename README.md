@@ -14,7 +14,10 @@
   - [ ] change from cli
   - [ ] make it a function of the number of instances?
   - [ ] use hash function to select instances instead of random
+- [ ] benchmark
 
 ## Meta
 
 Initial commit: [#7da73ac908f21fda8d2bee8c601d513899a729b4](https://github.com/blmayer/dkv/commit/7da73ac908f21fda8d2bee8c601d513899a729b4)
+
+License: Creative Commons Attribution 4.0

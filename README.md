@@ -8,7 +8,11 @@
 - [x] get
 - [x] post
 - [ ] delete
-- [ ] check on post [commit](https://github.com/blmayer/dkv/blob/d160e34976d570c9373090b23ef3901b8e04bcc7/cmd/root/instances.go#L60)
+- [x] check on post [commit](https://github.com/blmayer/dkv/blob/d160e34976d570c9373090b23ef3901b8e04bcc7/cmd/root/instances.go#L60)
+- [ ] tests
+- [ ] make replication better
+  - [ ] change from cli
+  - [ ] make it a function of the number of instances?
 
 ## Meta
 

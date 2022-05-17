@@ -13,6 +13,7 @@
 - [ ] make replication better
   - [ ] change from cli
   - [ ] make it a function of the number of instances?
+  - [ ] use hash function to select instances instead of random
 
 ## Meta
 

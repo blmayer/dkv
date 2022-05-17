@@ -7,8 +7,8 @@
 
 - [x] get
 - [x] post
-- [] delete
-- [] check on post [commit](https://github.com/blmayer/dkv/blob/d160e34976d570c9373090b23ef3901b8e04bcc7/cmd/root/instances.go#L60)
+- [ ] delete
+- [ ] check on post [commit](https://github.com/blmayer/dkv/blob/d160e34976d570c9373090b23ef3901b8e04bcc7/cmd/root/instances.go#L60)
 
 ## Meta
 

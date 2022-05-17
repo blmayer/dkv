@@ -4,8 +4,8 @@ import (
 	"io"
 	"net/http"
 
-	"dkv/internal/status"
 	"dkv/internal/op"
+	"dkv/internal/status"
 )
 
 func keyHandler(w http.ResponseWriter, r *http.Request) {
@@ -33,13 +33,12 @@ func handleGet(w http.ResponseWriter, r *http.Request) {
 
 	for _, i := range is {
 		println("requesting", i)
-		
+
 		c := *instances[i]
 		_, err := c.Write(append([]byte{op.Get}, []byte(k)...))
 		if err != nil {
 			println(err.Error())
-			instances[i] = nil
-			// go removeInstance(i)
+			moveInstanceKeys(i, k)
 			continue
 		}
 
@@ -83,22 +82,11 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 
 	for _, i := range is {
 		println("requesting", i)
-
 		c := *instances[i]
-		_, err := c.Write(append([]byte{op.Post}, []byte(k+"\n"+string(data[:n]))...))
+		resp, err := writeToInstance(c, op.Post, []byte(k+"\n"+string(data[:n])))
 		if err != nil {
 			println(err.Error(), "removing")
-			instances[i] = nil
-			handlePost(w, r)
-			return
-		}
-
-		// read response
-		resp := make([]byte, 1)
-		_, err = c.Read(resp)
-		if err != nil {
-			println("read error:", err.Error(),"removing")
-			instances[i] = nil
+			moveInstanceKeys(i, k)
 			handlePost(w, r)
 			return
 		}
@@ -110,7 +98,7 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// TODO: watch for key already used
-		keys[k] = append(keys[k], i) 
+		keys[k] = append(keys[k], i)
 		ikeys[i] = append(ikeys[i], k)
 		println("done", i)
 	}

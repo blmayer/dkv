@@ -5,8 +5,8 @@
 
 ## Using
 
-To run this database you'll need one instance of the root program, located in 
-`cmd/root`, and 2 or more leaf, or nodes, they are in `cmd/node`.
+To run this database you'll need one instance of the *root* program, located in 
+`cmd/root`, and 1 or more of the *node*, they are in `cmd/node`.
 
 To compile each you run `go build ./cmd/<root|node>/`, and the binary will be
 created for your platform.

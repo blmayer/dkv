@@ -37,7 +37,7 @@ func handleGet(w http.ResponseWriter, r *http.Request) {
 		println("handleGet: get for", i, k)
 		resp, err := writeToInstance(i, op.Get, []byte(k))
 		if err != nil {
-			println(err.Error())
+			println("handleGet: ", err.Error())
 			go moveInstanceKeys(i)
 			continue
 		}

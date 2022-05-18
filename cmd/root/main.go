@@ -11,8 +11,10 @@ import (
 var (
 	instances []*net.Conn
 
-	// TODO: get rid of theses maps
-	keys  = map[string][]int{}
+	// TODO: get rid of this map
+	keys = map[string][]int{}
+
+	// this is easy: make a list request to the node
 	ikeys = map[int][]string{}
 	rep   = 2
 )

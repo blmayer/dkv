@@ -3,6 +3,35 @@
 > DKV is a distributed in memory key-value database.
 
 
+## Using
+
+To run this database you'll need one instance of the root program, located in 
+`cmd/root`, and 2 or more leaf, or nodes, they are in `cmd/node`.
+
+To compile each you run `go build ./cmd/<root|node>/`, and the binary will be
+created for your platform.
+
+By default the root node listens on port 8080, as it is commonly used, and
+the port 1234 is made available for leaf instances to connect.
+
+### Example
+
+Open 4 terminals: on the first run `./root`, the root node must run first.
+Then on the other terminals run `./node`, they will connect to the root node.
+Now you can make HTTP requests for the root node:
+
+`curl http://localhost:8080/x -d 'test'`
+
+Will add the key *x* with value *test* to some instances. To retrieve it back use:
+
+`curl http://localhost:8080/x`
+
+And so on. Try creating some keys and then killing one node process. You can also
+delete keys using:
+
+`curl -X DELETE http://localhost:8080/x`
+
+
 ## Roadmap
 
 - [x] get

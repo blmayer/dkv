@@ -2,6 +2,6 @@ package status
 
 const (
 	Ok           = 'o'
-	ErrNoData    = 'd'
+	ErrNoData    = 'n'
 	ErrUnknownOp = 'u'
 )

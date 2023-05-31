@@ -1,22 +1,19 @@
 package main
 
 import (
+	"io"
 	"math/rand"
 	"net"
-	"net/http"
 	"os"
 	"time"
 )
 
 var (
-	instances []*net.Conn
+	me string
 
-	// TODO: get rid of this map
-	keys = map[string][]int{}
-
-	// this is easy: make a list request to the node
-	ikeys = map[int][]string{}
-	rep   = 2
+	// first part is 8 bytes time and then raw data
+	values = map[string][]byte{}
+	factor = 4
 )
 
 func main() {
@@ -27,25 +24,37 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	http.HandleFunc("/", keyHandler)
-	go func() {
-		err := http.ListenAndServe(":"+port, nil)
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	server, err := net.Listen("tcp", ":1234")
+	server, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		panic(err)
 	}
-	println("main: server ready on port 1234")
+	println("main: server ready on port ", port)
+	me = server.Addr().String()
+
 	for {
 		conn, err := server.Accept()
 		if err != nil {
-			println(err.Error())
+			println("main: conn accept", err.Error())
+			continue
 		}
 		println("main:", conn.RemoteAddr().String(), "connected")
-		instances = append(instances, &conn)
+
+		go func() {
+			data := make([]byte, 1024)
+			n, err := conn.Read(data)
+			if err == net.ErrClosed || err == io.EOF {
+				println("main: connection closed from", conn.RemoteAddr().String())
+				return
+			} else if err != nil {
+				println("main: read error:", err.Error())
+				return
+			}
+
+			resp := handleRequest(data[:n])
+			conn.Write(resp)
+			conn.Close()
+
+			println("mail: handler returned", string(resp))
+		}()
 	}
 }

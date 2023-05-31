@@ -1,143 +1,132 @@
 package main
 
 import (
-	"io"
-	"net/http"
+	"encoding/binary"
+	"net"
+	"os"
+	"sort"
+	"strings"
+	"time"
 
 	"dkv/internal/op"
 	"dkv/internal/status"
 )
 
-func keyHandler(w http.ResponseWriter, r *http.Request) {
-	k := r.URL.Path
-	println(r.Method, k)
-
-	switch r.Method {
-	case http.MethodGet:
-		handleGet(w, r)
-	case http.MethodPost:
-		handlePost(w, r)
-	case http.MethodDelete:
-		handleDelete(w, r)
+func handleRequest(data []byte) []byte {
+	println("handler: received", string(data))
+	if len(data) == 0 {
+		return []byte{status.ErrNoData}
 	}
-	r.Body.Close()
+
+	var res []byte
+	switch data[0] {
+	case op.Get:
+		val, ok := values[string(data[1:])]
+		if !ok {
+			// search other instances using the internal get
+			res = distribute(data)
+			break
+		}
+		res = append([]byte{status.Ok}, val[8:]...)
+	case op.Post:
+		kv := strings.Split(string(data[1:]), "\n")
+		values[kv[0]] = append(
+			binary.BigEndian.AppendUint64(make([]byte, 8), uint64(time.Now().Unix())),
+			kv[1]...,
+		)
+		res = []byte{status.Ok}
+		go distribute(data)
+	case op.Delete:
+		delete(values, string(data[1:]))
+		res = []byte{status.Ok}
+	case op.GetInternal:
+		val, ok := values[string(data[1:])]
+		if !ok {
+			res = []byte{status.ErrNoData, 0, 0, 0, 0, 0, 0, 0, 0}
+			break
+		}
+		res = append([]byte{status.Ok}, val...)
+	case op.PostInternal:
+		kv := strings.Split(string(data[1:]), "\n")
+		values[kv[0]] = append(
+			binary.BigEndian.AppendUint64(make([]byte, 8), uint64(time.Now().Unix())),
+			data[1:]...,
+		)
+		res = []byte{status.Ok}
+	case op.DeleteInternal:
+		delete(values, string(data[1:]))
+		res = []byte{status.Ok}
+	default:
+		res = []byte{status.ErrUnknownOp}
+	}
+
+	return res
 }
 
-func handleGet(w http.ResponseWriter, r *http.Request) {
-	k := r.URL.Path
+func distribute(data []byte) []byte {
+	println("distribute: start")
 
-	// get instances
-	is := keys[k]
-	if len(is) == 0 {
-		http.Error(w, "", http.StatusNotFound)
-		return
+	env := os.Getenv("DKV_INSTANCES")
+	ins := strings.Split(env, ",")
+	if len(ins) < 3 {
+		println("distribute: not enough instances")
+		return []byte{status.ErrNoData}
 	}
 
-	for _, i := range is {
-		println("handleGet: get for", i, k)
-		resp, err := writeToInstance(i, op.Get, []byte(k))
+	for i, addr := range ins {
+		if me == addr {
+			ins[i] = ins[len(ins)-1]
+			ins = ins[:len(ins)-1]
+			break
+		}
+	}
+
+	// at least 2 instances of replication
+	n := len(ins) / factor
+	if n < 2 {
+		n = 2
+	}
+	ins = ins[:n-1]
+
+	switch data[0] {
+	case op.Get:
+		data[0] = op.GetInternal
+	case op.Post:
+		data[0] = op.PostInternal
+	case op.Delete:
+		data[0] = op.DeleteInternal
+	}
+
+	// TODO: make async and random
+	res := make([][]byte, len(ins))
+	for k, i := range ins {
+		conn, err := net.Dial("tcp", i)
 		if err != nil {
-			println("handleGet: ", err.Error())
-			go moveInstanceKeys(i)
+			println("distribute:", err.Error())
 			continue
 		}
 
-		w.Write(resp[1:])
-		break
-	}
-}
+		res[k] = make([]byte, 1024)
+		go conn.Write(data)
 
-func handlePost(w http.ResponseWriter, r *http.Request) {
-	k := r.URL.Path
-
-	data := make([]byte, 1024)
-	n, err := r.Body.Read(data)
-	if err != nil && err != io.EOF {
-		println("handlePost read:", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	r.Body.Close()
-	println("handlePost: data:", string(data[:n]))
-	postToInstances(rep, k, data[:n])
-
-	w.WriteHeader(http.StatusCreated)
-}
-
-func handleDelete(w http.ResponseWriter, r *http.Request) {
-	k := r.URL.Path
-	println("handleDelete: key:", k)
-
-	is := keys[k]
-	for _, i := range is {
-		resp, err := writeToInstance(i, op.Delete, []byte(k))
+		bs, err := conn.Read(res[k])
 		if err != nil {
-			println("handleDelete: writeToInstance:", err.Error())
-		}
-		if resp[0] != status.Ok {
-			println("handleDelete: status not ok")
-		}
-
-		// remove from inverted keys index
-		go func(ins int) {
-			ks := ikeys[ins]
-			for u, key := range ks {
-				if key == k {
-					ks[u] = ks[len(ks)-1]
-					ks = ks[:len(ks)-1]
-					ikeys[ins] = ks
-					break
-				}
-			}
-		}(i)
-	}
-
-	delete(keys, k)
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func moveInstanceKeys(i int) {
-	instances[i] = nil
-	println("moveInstanceKeys: moving keys from", i)
-
-	newIs := chooseInstances(rep - 1)
-	for _, k := range ikeys[i] {
-		comps := getCompanionInstances(i, k)
-		if len(comps) == 0 {
-			println("moveInstanceKeys: lost key", k)
-			return
-		}
-		println("moveInstanceKeys: moving keys from", comps[0])
-		println("moveInstanceKeys: requesting", comps[0])
-		resp, err := writeToInstance(comps[0], op.Get, []byte(k))
-		if err != nil {
-			println("moveInstanceKeys: failed to get old key", k)
+			println("distribute:", i, "returned", err.Error())
 			continue
 		}
-		if len(resp) < 2 {
-			println("moveInstanceKeys: no data for old key", k)
-			continue
-		}
-
-		keys[k] = []int{}
-		for _, n := range newIs {
-			println("moving", k, "to", n)
-			data := []byte(k + "\n" + string(resp[1:]))
-			resp, err := writeToInstance(n, op.Post, data)
-			if err != nil {
-				println("moveInstanceKeys: failed to post old key", k)
-				continue
-			}
-			if len(resp) == 0 || resp[0] != status.Ok {
-				println("moveInstanceKeys: not ok for old key", k)
-				continue
-			}
-			keys[k] = append(keys[k], n)
-			ikeys[n] = append(ikeys[n], k)
-		}
-
-		ikeys[i] = []string{}
-		println("moveInstanceKeys: moved key", k)
+		res[k] = res[k][:bs-1]
+		conn.Close()
 	}
+
+	// check responses
+	sort.Slice(
+		res,
+		func(i, j int) bool {
+			ti := binary.BigEndian.Uint64(res[i][1:9])
+			tj := binary.BigEndian.Uint64(res[j][1:9])
+			return ti > tj
+		},
+	)
+
+	return res[0]
 }
